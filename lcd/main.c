@@ -35,9 +35,14 @@ const uint16_t ball_sprite_data[] = {
     0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
 };
 
-uint16_t sprite_buf[7*7];
+uint16_t sprite_buf[64];
 
-void move_ball(int old_x, int old_y, int inc_x, int inc_y)
+static void delay_loop(int cycles) {
+    volatile int i;
+    for (i = 0; i < cycles; ++i);
+}
+
+static void move_ball(int old_x, int old_y, int inc_x, int inc_y)
 {
     int top_x = inc_x > 0 ? 1 : 0;
     int top_y = inc_y > 0 ? 1 : 0;
@@ -52,8 +57,8 @@ void move_ball(int old_x, int old_y, int inc_x, int inc_y)
 
 #define BAT_Y 235
 #define BAT_COLOUR 7
-#define BAT_WIDTH 24
-void draw_bat(int x)
+#define BAT_WIDTH 32
+static void draw_bat(int x)
 {
     for (int i = 0; i < BAT_WIDTH*2; ++i) {
         sprite_buf[i] = BAT_COLOUR;
@@ -61,7 +66,7 @@ void draw_bat(int x)
     lcd_draw_sprite(x, BAT_Y, BAT_WIDTH, sprite_buf, BAT_WIDTH*2);
 }
 
-void move_bat(int old_x, int inc_x)
+static void move_bat(int old_x, int inc_x)
 {
     sprite_buf[0] = 0;
     sprite_buf[1] = 0;
@@ -76,48 +81,100 @@ void move_bat(int old_x, int inc_x)
         lcd_draw_sprite(old_x - 1, BAT_Y, 1, sprite_buf+2, 2);
         lcd_draw_sprite(old_x + BAT_WIDTH - 1, BAT_Y, 1, sprite_buf, 2);
     }
+    else {
+        // Do nothing at similar cost
+        lcd_draw_sprite(old_x, BAT_Y, 1, sprite_buf+2, 2);
+        lcd_draw_sprite(old_x, BAT_Y, 1, sprite_buf+2, 2);
+    }
+}
+
+static void run_game() {
+    lcd_clear_screen(0);
+
+    int bat_x = 110;
+    draw_bat(bat_x);
+
+    struct ball b = {.x=50<<4, .y=200<<4, .xvel=1, .yvel=-1<<2};
+
+    int frame = 0;
+
+    while (1) {
+        if ((++frame & 0xFFF) == 0) {
+            if (b.yvel < 0) --b.yvel;
+            if (b.yvel > 0) ++b.yvel;
+        }
+        if ((frame & 0xFF) == 0) {
+            sprite_buf[0] = 0xFFFF;
+            lcd_draw_sprite(frame >> 8, 0, 1, sprite_buf, 1);
+        }
+
+        const int inputs = ~get_inputs();
+
+        const int old_ball_x = b.x >> 4;
+        const int old_ball_y = b.y >> 4;
+
+        b.x += b.xvel;
+        b.y += b.yvel;
+        if ((b.x < 1<<4 && b.xvel < 0) || (b.x > 231<<4 && b.xvel > 0)) b.xvel = -b.xvel;
+        if (b.y < 2<<4) b.yvel = -b.yvel;
+
+        const int new_ball_x = b.x >> 4;
+        if (b.y > (BAT_Y - 8) << 4) {
+            if (new_ball_x + 5 > bat_x && new_ball_x < bat_x + BAT_WIDTH) {
+                b.yvel = -b.yvel;
+                if (inputs & 1) {
+                    --b.xvel;
+                    if (b.xvel == 0) b.xvel = -1;
+                }
+                else if (inputs & 2) {
+                    ++b.xvel;
+                    if (b.xvel == 0) b.xvel = 1;
+                }
+            }
+            else break;
+        }
+
+        const int new_ball_y = b.y >> 4;
+
+        // Call move ball even if not moved otherwise timing will chnage a lot
+        move_ball(old_ball_x, old_ball_y, new_ball_x - old_ball_x, new_ball_y - old_ball_y);
+
+        if ((frame & 3) == 0) {
+            if ((inputs & 1) && bat_x > 1) {
+                move_bat(bat_x, -1);
+                bat_x--;
+            }
+            else if ((inputs & 2) && bat_x < 238 - BAT_WIDTH) {
+                move_bat(bat_x, 1);
+                bat_x++;
+            }
+            else {
+                move_bat(bat_x, 0);
+            }
+        }
+    }
+
+    printf("Game Over\r\n");
+    lcd_display_string("Game Over!", 80, 40);
 }
 
 int main(void)
 {
-    //printf("Start\r\n");
+    printf("Start\r\n");
     setup_lcd();
     printf("LCD setup\r\n");
     lcd_text_init();
 
     lcd_display_string("!Hello, world!?!", 10, 10);
+    printf("Hello\r\n");
     lcd_display_string("NanoV RV32E system\nMike's submission for\nTinyTapeout 4", 10, 50);
 
     lcd_printf(10, 150, "Printf test: %d %02x", 23, 67);
-
-    int bat_x = 110;
-    draw_bat(bat_x);
-
-    struct ball b = {.x=50, .y=200, .xvel=1, .yvel=-1};
+    printf("Test\r\n");
 
     while (1) {
-        move_ball(b.x, b.y, b.xvel, b.yvel);
-
-        b.x += b.xvel;
-        b.y += b.yvel;
-
-        if (b.x < 1 || b.x > 231) b.xvel = -b.xvel;
-        if (b.y < 1) b.yvel = -b.yvel;
-        if (b.y > BAT_Y - 8) {
-            if (b.x + 4 > bat_x && b.x + 1 < bat_x + BAT_WIDTH) b.yvel = -b.yvel;
-            else break;
-        }
-
-        int inputs = ~get_inputs();
-        if ((inputs & 1) && bat_x > 1) {
-            move_bat(bat_x, -1);
-            bat_x--;
-        }
-        else if ((inputs & 2) && bat_x < 238 - BAT_WIDTH) {
-            move_bat(bat_x, 1);
-            bat_x++;
-        }
+        run_game();
+        delay_loop(500000);
+        while ((~get_inputs() & 3) == 0);
     }
-
-    lcd_display_string("Game Over!", 80, 200);
 }
