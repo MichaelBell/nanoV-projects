@@ -21,4 +21,4 @@ $(NAME).bin: $(NAME).elf
 	python3 $(NANOV_SDK)/reverse_bits.py tmp.rbin $@
 
 $(NAME).uf2: $(NAME).bin
-	bin2uf2 -o $@ 0x400000 $<
+	bin2uf2 -o $@ 0x20000000 $<

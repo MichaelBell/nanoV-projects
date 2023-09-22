@@ -21,31 +21,31 @@ int main(void) {
 	while (1) {
 		delay_loop(5000);
 
-		j <<= 1;
-		if (j == 0) j = 1;
-		printf("%08x\r\n", j);
-
-		REP16(set_leds(0);set_leds(1);)
-
+		printf("Hello %d\r\n", j);
+		j++;
 		set_leds(led_data[i++]);
-		if (i >= sizeof(led_data) / sizeof(led_data[0])) i = 0;
-
-		delay_loop(5000);
-		REP16(set_leds(0);set_leds(1);)
-		set_leds(led_data[i++]);
-		if (i >= sizeof(led_data) / sizeof(led_data[0])) i = 0;
-
-		delay_loop(5000);
-		REP16(set_leds(0);set_leds(1);)
-		set_leds(led_data[i++]);
-		if (i >= sizeof(led_data) / sizeof(led_data[0])) i = 0;
-
-		delay_loop(5000);
-		REP16(set_leds(0);set_leds(1);)
-		set_leds(led_data[i++]);
-		if (i >= sizeof(led_data) / sizeof(led_data[0])) i = 0;
-
+		if (i >= 7) i = 0;
 #if 0
+		REP16(set_leds(0);set_leds(1);)
+
+		set_leds(led_data[i++]);
+		if (i >= sizeof(led_data) / sizeof(led_data[0])) i = 0;
+
+		delay_loop(5000);
+		REP16(set_leds(0);set_leds(1);)
+		set_leds(led_data[i++]);
+		if (i >= sizeof(led_data) / sizeof(led_data[0])) i = 0;
+
+		delay_loop(5000);
+		REP16(set_leds(0);set_leds(1);)
+		set_leds(led_data[i++]);
+		if (i >= sizeof(led_data) / sizeof(led_data[0])) i = 0;
+
+		delay_loop(5000);
+		REP16(set_leds(0);set_leds(1);)
+		set_leds(led_data[i++]);
+		if (i >= sizeof(led_data) / sizeof(led_data[0])) i = 0;
+
 		delay_loop(5000);
 		REP16(set_leds(0);set_leds(1);)
 		set_leds(led_data[i++]);
