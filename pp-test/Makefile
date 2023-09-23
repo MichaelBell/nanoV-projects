@@ -14,7 +14,7 @@ clean:
 	riscv32-unknown-elf-as -march=rv32e -mabi=ilp32e $< -o $@
 
 $(NAME).elf: main.o lcd.o logo.o
-	riscv32-unknown-elf-ld $^ $(NANOV_SDK)/start.o /opt/riscv/riscv32-unknown-elf/lib/libc.a $(NANOV_SDK)/nanoV-femto.a /opt/riscv/lib/gcc/riscv32-unknown-elf/12.2.0/libgcc.a  -T $(NANOV_SDK)/memmap --gc-sections -o $@
+	riscv32-unknown-elf-ld $^ $(NANOV_SDK)/start.o /opt/riscv/riscv32-unknown-elf/lib/libc.a $(NANOV_SDK)/nanoV.a /opt/riscv/lib/gcc/riscv32-unknown-elf/12.2.0/libgcc.a  -T $(NANOV_SDK)/memmap --gc-sections -o $@
 
 $(NAME).bin: $(NAME).elf
 	riscv32-unknown-elf-objcopy $< -O binary tmp.rbin

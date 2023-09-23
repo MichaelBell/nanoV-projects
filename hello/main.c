@@ -1,5 +1,6 @@
 #include <gpio.h>
 #include <uart.h>
+#include <mul.h>
 #define printf uart_printf
 
 #define REP4(X) X X X X
@@ -21,7 +22,7 @@ int main(void) {
 	while (1) {
 		delay_loop(5000);
 
-		printf("Hello %d\r\n", j);
+		printf("Hello %d %d\r\n", j, mul32x16(j, i));
 		j++;
 		set_leds(led_data[i++]);
 		if (i >= 7) i = 0;

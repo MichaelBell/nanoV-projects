@@ -3,6 +3,7 @@
 //#define PERFORMANCE_TEST
 #include <uart.h>
 #define printf uart_printf
+#include <mul.h>
 
 #include "ctype.h"
 #include "pretty-poly.h"
@@ -16,16 +17,26 @@ const int HEIGHT = 240;
 void callback(const pp_tile_t tile) {
   //debug_tile(tile);
 
+  uint16_t buffer[tile.bounds.w];
+  uint8_t* alpha_data = tile.data;
   for(int y = 0; y < tile.bounds.h; y++) {
-    uint16_t buffer[tile.bounds.w];
-    for(int x = 0; x < tile.bounds.w; x++) {     
-      uint8_t alpha = pp_tile_get_value(&tile, x, y); 
-      uint16_t r = (234 * alpha) & 0xF800;
-      uint16_t g = ((78 * alpha) >> 5) & 0x07E0;
-      uint16_t b = ((63 * alpha) >> 11);
-      buffer[x] = __builtin_bswap16(r | g | b);
+    int minx = 0, maxx = -1;
+    for(int x = 0; x < tile.bounds.w; x++) {
+      if (alpha_data[x]) {
+        buffer[x] = 0x67EA;
+        maxx = x;
+      }
+      else if (minx == x) {
+        ++minx;
+      }
+      else {
+        buffer[x] = 0;
+      }
     }
-    lcd_draw_sprite(tile.bounds.x, tile.bounds.y + y, tile.bounds.w, buffer, tile.bounds.w);
+    if (maxx >= 0) {
+      lcd_draw_sprite(tile.bounds.x + minx, tile.bounds.y + y, tile.bounds.w, buffer + minx, maxx - minx + 1);
+    }
+    alpha_data += tile.stride;
   }
 }
 
@@ -33,18 +44,18 @@ void callback(const pp_tile_t tile) {
 // features, indeed it just barely manages to extract this logo
 // perhaps it could be fun to extend this in future - it would
 // provide a simple way to import vector artwork into projects
-pp_point_t point_on_cubic_bezier(float t, pp_point_t s, pp_point_t cp1, pp_point_t cp2, pp_point_t e) {
-  float t2 = t * t;
-  float t3 = t * t * t;
+pp_point_t point_on_cubic_bezier(int t, pp_point_t s, pp_point_t cp1, pp_point_t cp2, pp_point_t e) {
+  int t2 = t * t;
+  int t3 = t * t * t;
   return (pp_point_t) {
-    .x = s.x + (-s.x * 3 + (s.x * 3 - s.x * t) * t) * t
-          + (cp1.x * 3 + (cp1.x * -6 + cp1.x * 3 * t) * t) * t
-          + (cp2.x * 3 - cp2.x * 3 * t) * t2
-          + e.x * t3,
-    .y = s.y + (-s.y * 3 + (s.y * 3 - s.y * t) * t) * t
-          + (cp1.y * 3 + (cp1.y * -6 + cp1.y * 3 * t) * t) * t
-          + (cp2.y * 3 - cp2.y * 3 * t) * t2
-          + e.y * t3
+    .x = ((s.x << 6) + mul32x16(mul32x16(-s.x, 3 * 16) + mul32x16(mul32x16(s.x, 3 * 4) - mul32x16(s.x, t), t), t)
+          + mul32x16(mul32x16(cp1.x, 3 * 16) + mul32x16(-mul32x16(cp1.x, 6 * 4) + mul32x16(cp1.x, 3 * t),  t), t)
+          + mul32x16((mul32x16(cp2.x, 3 * 4) - mul32x16(cp2.x, 3 * t)), t2)
+          + mul32x16(e.x, t3)) >> 6,
+    .y = ((s.y << 6) + mul32x16(mul32x16(-s.y, 3 * 16) + mul32x16(mul32x16(s.y, 3 * 4) - mul32x16(s.y, t), t), t)
+          + mul32x16(mul32x16(cp1.y, 3 * 16) + mul32x16(-mul32x16(cp1.y, 6 * 4) + mul32x16(cp1.y, 3 * t),  t), t)
+          + mul32x16((mul32x16(cp2.y, 3 * 4) - mul32x16(cp2.y, 3 * t)), t2)
+          + mul32x16(e.y, t3)) >> 6
   };
 }
 
@@ -222,9 +233,15 @@ pp_contour_t parse_svg_path_contour(char **caret) {
       get_next_token(caret, token);
       point.y = atoi(token) + last.y;
 
-      result.points[i++] = point_on_cubic_bezier(0.25, last, c1, c2, point);
-      result.points[i++] = point_on_cubic_bezier(0.50, last, c1, c2, point);
-      result.points[i++] = point_on_cubic_bezier(0.75, last, c1, c2, point);
+#if 1
+      result.points[i++] = point_on_cubic_bezier(1, last, c1, c2, point);
+      result.points[i++] = point_on_cubic_bezier(2, last, c1, c2, point);
+      result.points[i++] = point_on_cubic_bezier(3, last, c1, c2, point);
+#else
+      result.points[i++] = point_on_cubic_bezier(0.25f, last, c1, c2, point);
+      result.points[i++] = point_on_cubic_bezier(0.5f, last, c1, c2, point);
+      result.points[i++] = point_on_cubic_bezier(0.75f, last, c1, c2, point);
+#endif
       result.points[i++] = point;
 
       last = point;
@@ -283,7 +300,7 @@ void draw_logo(void) {
 
   // setup polygon renderer  
   pp_tile_callback(callback);
-  pp_antialias(PP_AA_X4);
+  pp_antialias(PP_AA_NONE);
   pp_clip((pp_rect_t){0, 0, WIDTH, HEIGHT});
   
   // parse logo svg path into contours
