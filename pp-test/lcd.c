@@ -108,6 +108,20 @@ void setup_lcd()
     stop_pixels();
 }
 
+void lcd_clear_to_black()
+{
+    start_pixels(0, 0, 240);
+    int outputs = get_outputs();
+    outputs &= ~((1 << LCD_MOSI) | (1 << LCD_SCK));
+    int sck_low = outputs;
+    int sck_high = outputs | (1 << LCD_SCK);
+    for (int i = 0; i < 240*240; ++i) {
+        REP16(set_outputs(sck_low);set_outputs(sck_high);)
+    }
+    set_outputs(sck_low);
+    stop_pixels();
+}
+
 void lcd_clear_screen(uint16_t colour)
 {
     start_pixels(0, 0, 240);
